@@ -88,7 +88,7 @@ class _BuildDZContent extends State<BuildDZContent> {
     await SendRequest.request(
       context: context,
       method: "GET",
-      route: RouteName.getDZ,
+      route: RouteName.noIdRoutes.homePage.getDz,
       query: {
         "sort_method": Provider.of<HomePageProvider>(context, listen: false).sortMethod,
         "any": (() {
@@ -126,7 +126,6 @@ class _BuildDZContent extends State<BuildDZContent> {
               _data.clear();
               _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
             }
-            print(_data);
             setState(() {});
           }),
         ]);

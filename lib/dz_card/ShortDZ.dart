@@ -1,8 +1,10 @@
 import 'package:dzclient/dz_card/DZPage.dart';
+import 'package:dzclient/handles/UserIcons.dart';
 import 'package:flutter/material.dart';
 
 class ShortDZ extends StatelessWidget {
   ShortDZ({@required this.dataItem});
+  //已经判断过dataItem为null的处理方式，所以这里一定不为null
   final Map dataItem;
 
   @override
@@ -12,39 +14,20 @@ class ShortDZ extends StatelessWidget {
   }
 
   void initData() {
-    dataItem["dz_id"] ??= "0";
-    dataItem["user_id"] ??= "0";
+    dataItem["dz_id"] ??= "获取失败";
+    dataItem["user_id"] ??= "获取失败";
     dataItem["title"] ??= "获取失败";
     dataItem["short_content"] ??= "获取失败";
     dataItem["update_time"] ??= 0;
     dataItem["username"] ??= "获取失败";
-    if (dataItem["user_icon"] == null) {
-      dataItem["user_icon"] = -1;
-      switch (dataItem["user_icon"]) {
-        case 0:
-          dataItem["user_icon"] = Icon(Icons.assistant_photo);
-          break;
-        default:
-          dataItem["user_icon"] = Icon(Icons.ac_unit);
-      }
-    } else if (dataItem["user_icon"].runtimeType == int) {
-      switch (dataItem["user_icon"]) {
-        case 0:
-          dataItem["user_icon"] = Icon(Icons.assistant_photo);
-          break;
-        default:
-          dataItem["user_icon"] = Icon(Icons.ac_unit);
-      }
-    } else {}
+    dataItem["user_icon"] ??= 0;
     dataItem["review_count"] ??= 0;
-
     dataItem["review0"] == null || dataItem["review0"]["reviewer_user_id"] == null || dataItem["review0"]["content"] == null || dataItem["review0"]["reviewer_username"] == null
         ? dataItem["review0"] = null
         : () {}();
     dataItem["review1"] == null || dataItem["review1"]["reviewer_user_id"] == null || dataItem["review1"]["content"] == null || dataItem["review1"]["reviewer_username"] == null
         ? dataItem["review1"] = null
         : () {}();
-
     dataItem["star_count"] ??= 0;
     dataItem["like_count"] ??= 0;
   }
@@ -72,13 +55,11 @@ class _ShortDZContent extends State<ShortDZContent> with AutomaticKeepAliveClien
   @override
   void initState() {
     super.initState();
-    print("init");
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    print("build");
     return GestureDetector(
       child: cardMain(),
       onPanDown: (_) {
@@ -131,7 +112,7 @@ class _ShortDZContent extends State<ShortDZContent> with AutomaticKeepAliveClien
             borderRadius: BorderRadius.circular(50),
             boxShadow: <BoxShadow>[BoxShadow(blurRadius: 2)],
           ),
-          child: widget.dataItem["user_icon"],
+          child: UserIcons.getUserIconWidget(widget.dataItem["user_icon"]),
         ),
         SizedBox(width: 10),
         Column(
@@ -204,9 +185,7 @@ class _ShortDZContent extends State<ShortDZContent> with AutomaticKeepAliveClien
         Expanded(child: Container()),
         GestureDetector(
           child: Text("谢谢谢谢", style: TextStyle(fontSize: 12, color: Colors.blue)),
-          onTap: () {
-            print("谢谢谢谢");
-          },
+          onTap: () {},
         ),
         Expanded(child: Container()),
         Text(
@@ -241,7 +220,7 @@ class _ShortDZContent extends State<ShortDZContent> with AutomaticKeepAliveClien
                             WidgetSpan(
                               child: GestureDetector(
                                 child: Text(
-                                  widget.dataItem["review0"]["reviewer_username"].toString(),
+                                  widget.dataItem["review0"]["reviewer_username"],
                                   style: TextStyle(color: Colors.blue, backgroundColor: _bc1),
                                 ),
                                 onPanDown: (_) {
@@ -286,7 +265,7 @@ class _ShortDZContent extends State<ShortDZContent> with AutomaticKeepAliveClien
                             WidgetSpan(
                               child: GestureDetector(
                                 child: Text(
-                                  widget.dataItem["review1"]["reviewer_username"].toString(),
+                                  widget.dataItem["review1"]["reviewer_username"],
                                   style: TextStyle(color: Colors.blue, backgroundColor: _bc2),
                                 ),
                                 onPanDown: (_) {

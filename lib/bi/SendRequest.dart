@@ -60,7 +60,7 @@ class SendRequest {
     BotToast.showNotification(title: (_) => Text("正在发送..."));
 
     ///TODO: 耗时测试，可移除
-    // await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: 2));
 
     await _dio
         .request(

@@ -138,11 +138,10 @@ List<Widget> loginContent(loginContext) {
             child: Text("登陆"),
             onPressed: () {
               //TODO: 先检验用户名和密码的合法性
-              //md:|POST|/login|无|token|"username","password"|无|
               SendRequest.request(
                 method: "POST",
                 context: loginContext,
-                route: RouteName.login,
+                route: RouteName.mainRoutes.login,
                 data: {
                   "username": usernameValue,
                   "password": passwordValue,
@@ -167,11 +166,10 @@ List<Widget> loginContent(loginContext) {
             child: Text("注册"),
             onPressed: () {
               //TODO: 先检验用户名和密码的合法性
-              //md:|POST|/register|无|token|"username","password"|无|
               SendRequest.request(
                 method: "POST",
                 context: loginContext,
-                route: RouteName.register,
+                route: RouteName.mainRoutes.register,
                 data: {
                   "username": usernameValue,
                   "password": passwordValue,

@@ -102,11 +102,10 @@ class _CreateDZPage extends State<CreateDZPage> {
             child: Text("确认", style: TextStyle(color: Colors.red)),
             onPressed: () {
               Navigator.pop(context);
-              //md:|POST|/need_id/create_dz|need_id|token|"title","content"|无|
               SendRequest.request(
                 method: "POST",
                 context: context,
-                route: RouteName.createDZ,
+                route: RouteName.needIdRoutes.createDzPage.createDz,
                 data: {
                   "title": _titleController.text,
                   "content": _contentController.text,
