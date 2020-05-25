@@ -56,6 +56,8 @@ class NoIdRoutes {
 class NoIdRoutesDzPage {
   String enterDz = "/no_id/dz_page/enter_dz";
   String getReview1 = "/no_id/dz_page/get_review1";
+  String getStar = "/no_id/dz_page/get_star";
+  String getLike = "/no_id/dz_page/get_like";
 }
 
 class NoIdRouteHomePage {

@@ -75,7 +75,17 @@ class _DZPage extends State<DZPage> {
         );
         break;
       case ConnectionState.done:
-        return DzContentBuilder(data: _data);
+        return StatefulBuilder(
+          builder: (_, rebuild) {
+            return DzContentBuilder(
+              data: _data,
+              reloadDzContent: () async {
+                await _future();
+                rebuild(() {});
+              },
+            );
+          },
+        );
         break;
       default:
         return Scaffold(
@@ -99,9 +109,12 @@ class _DZPage extends State<DZPage> {
 ///
 ///
 class DzContentBuilder extends StatefulWidget {
-  DzContentBuilder({this.data});
+  DzContentBuilder({this.data, this.reloadDzContent});
   // widget.data不会为null,因为已经有默认值{}了
   final Map data;
+  //要用reloadDzContent替代当前类的setState，因为需要data重新初始化
+  final Function reloadDzContent;
+
   @override
   State<StatefulWidget> createState() {
     return _DzContentBuilder();
@@ -114,7 +127,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 
   List<Function(bool)> _hasPullUpFunc = [(bool) {}];
   List<Function(bool)> _hasSortButtonFunc = [(bool) {}];
-  List<Function(bool)> _hasFailPromptFunc = [(bool) {}];
+  List<Function(Widget)> _loadWidgetPromptFunc = [(Widget w) {}];
 
   GlobalKey<_AllListBuilderSliver> _allListBuilderSliverGlobalKey = GlobalKey<_AllListBuilderSliver>();
 
@@ -147,7 +160,6 @@ class _DzContentBuilder extends State<DzContentBuilder> {
     widget.data["review_count"] ??= 0;
   }
 
-  ///TODO: 点击后会报错
   Widget _bottomNavigationBar() {
     return Container(
       color: Colors.blue,
@@ -168,14 +180,14 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                   showReview(
                     context: context,
                     textEditingController: _textEditingController,
-                    speakToWho: "???",
+                    speakToWho: widget.data["username"],
                     onSend: () {
                       SendRequest.request(
                         context: context,
                         method: "POST",
                         data: {
                           //给谁评论
-                          "dz_id": "???",
+                          "dz_id": widget.data["dz_id"],
                           "content": _textEditingController.value.text,
                         },
                         route: RouteName.needIdRoutes.dzPage.sendReview,
@@ -234,11 +246,11 @@ class _DzContentBuilder extends State<DzContentBuilder> {
       header: WaterDropHeader(),
       footer: _footer(),
       controller: _refreshController,
-      onRefresh: () {
+      onRefresh: () async {
+        await widget.reloadDzContent();
         _refreshController.refreshCompleted();
       },
       onLoading: () async {
-        await Future.delayed(Duration(seconds: 1));
         _refreshController.loadComplete();
       },
       child: CustomScrollView(
@@ -250,7 +262,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
           _centerBarSliver(),
 
           ///失败提示栏
-          _failPromptSliver(),
+          _loadPromptSliver(),
 
           ///sort栏
           _sortButtonSliver(),
@@ -259,7 +271,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
           _allListBuilderSliver(
             hasPullUpFunc: _hasPullUpFunc,
             hasSortButtonFunc: _hasSortButtonFunc,
-            hasFailPromptFunc: _hasFailPromptFunc,
+            loadWidgetPromptFunc: _loadWidgetPromptFunc,
           )
         ],
       ),
@@ -404,21 +416,18 @@ class _DzContentBuilder extends State<DzContentBuilder> {
     );
   }
 
-  ///失败提示栏
-  Widget _failPromptSliver() {
+  ///加载提示栏
+  Widget _loadPromptSliver() {
     ///默认值false
-    bool _hasFailPrompt = false;
+    Widget loadPromptWidget = Container();
     return SliverToBoxAdapter(
       child: StatefulBuilder(
         builder: (_, failPromptRebuild) {
-          _hasFailPromptFunc[0] = (bool hasFP) {
-            _hasFailPrompt = hasFP;
+          _loadWidgetPromptFunc[0] = (Widget w) {
+            loadPromptWidget = w;
             failPromptRebuild(() {});
           };
-          if (_hasFailPrompt == false) {
-            return Container();
-          }
-          return Text("失败");
+          return loadPromptWidget;
         },
       ),
     );
@@ -496,12 +505,13 @@ class _DzContentBuilder extends State<DzContentBuilder> {
   Widget _allListBuilderSliver({
     @required List<Function(bool)> hasPullUpFunc,
     @required List<Function(bool)> hasSortButtonFunc,
-    @required List<Function(bool)> hasFailPromptFunc,
+    @required List<Function(Widget)> loadWidgetPromptFunc,
   }) {
     return AllListBuilderSliver(
+      dzId: widget.data["dz_id"],
       hasPullUpFunc: hasPullUpFunc,
       hasSortButtonFunc: hasSortButtonFunc,
-      hasFailPromptFunc: hasFailPromptFunc,
+      loadWidgetPromptFunc: loadWidgetPromptFunc,
       key: _allListBuilderSliverGlobalKey,
     );
   }
@@ -519,14 +529,17 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 ///
 class AllListBuilderSliver extends StatefulWidget {
   AllListBuilderSliver({
+    @required this.dzId,
     @required this.hasPullUpFunc,
     @required this.hasSortButtonFunc,
-    @required this.hasFailPromptFunc,
+    @required this.loadWidgetPromptFunc,
     @required Key key,
   }) : super(key: key);
+  final String dzId;
   final List<Function(bool)> hasPullUpFunc;
   final List<Function(bool)> hasSortButtonFunc;
-  final List<Function(bool)> hasFailPromptFunc;
+  final List<Function(Widget)> loadWidgetPromptFunc;
+
   @override
   State<StatefulWidget> createState() {
     return _AllListBuilderSliver();
@@ -550,11 +563,25 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
 
   ///失败返回false，成功则返回其数据
   Future _future() {
-    if (_tabIndex == 1) {
+    if (_tabIndex == 0) {
       return SendRequest.request(
         context: context,
         method: "GET",
-        route: null,
+        route: RouteName.noIdRoutes.dzPage.getStar,
+        responseValue: (code, response) {},
+      );
+    } else if (_tabIndex == 2) {
+      return SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getLike,
+        responseValue: (code, response) {},
+      );
+    } else {
+      return SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getReview1,
         responseValue: (code, response) {},
       );
     }
@@ -594,7 +621,7 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
     widgetsBinding.addPostFrameCallback((timeStamp) {
       widget.hasPullUpFunc[0](false);
       widget.hasSortButtonFunc[0](false);
-      widget.hasFailPromptFunc[0](false);
+      widget.loadWidgetPromptFunc[0](Container());
     });
   }
 
@@ -604,15 +631,15 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
       if (_tabIndex == 0) {
         widget.hasPullUpFunc[0](true);
         widget.hasSortButtonFunc[0](false);
-        widget.hasFailPromptFunc[0](false);
+        widget.loadWidgetPromptFunc[0](Container());
       } else if (_tabIndex == 2) {
         widget.hasPullUpFunc[0](true);
         widget.hasSortButtonFunc[0](false);
-        widget.hasFailPromptFunc[0](false);
+        widget.loadWidgetPromptFunc[0](Container());
       } else {
         widget.hasPullUpFunc[0](true);
         widget.hasSortButtonFunc[0](true);
-        widget.hasFailPromptFunc[0](false);
+        widget.loadWidgetPromptFunc[0](Container());
       }
     });
   }
@@ -622,11 +649,16 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
     widgetsBinding.addPostFrameCallback((timeStamp) {
       widget.hasPullUpFunc[0](false);
       widget.hasSortButtonFunc[0](false);
-      widget.hasFailPromptFunc[0](true);
+      widget.loadWidgetPromptFunc[0](Container());
     });
   }
 }
 
+///
+///
+///
+///
+///
 class ReviewBuilder extends StatefulWidget {
   @override
   State<StatefulWidget> createState() {
@@ -635,14 +667,13 @@ class ReviewBuilder extends StatefulWidget {
 }
 
 class _ReviewBuilder extends State<ReviewBuilder> {
-  //防止同时触发父组件的onPanDown事件
-  bool _isChildOnPanDown = false;
-  Color _mainc = Colors.white;
-  Color _bc1;
-  Color _bc2;
+  ///必须默认为true
+  bool _isMainEvent = true;
 
   @override
   Widget build(BuildContext context) {
+    Color mainColor = Colors.white;
+
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (_, index) {
@@ -650,23 +681,29 @@ class _ReviewBuilder extends State<ReviewBuilder> {
             builder: (_, rebuild) {
               return GestureDetector(
                 onPanDown: (_) {
-                  if (!_isChildOnPanDown) {
-                    _mainc = Colors.grey[300];
+                  if (_isMainEvent == true) {
+                    mainColor = Colors.grey[300];
                     rebuild(() {});
                   }
                 },
                 onPanCancel: () {
-                  _mainc = Colors.white;
-                  rebuild(() {});
+                  if (_isMainEvent == true) {
+                    mainColor = Colors.white;
+                    rebuild(() {});
+                  }
                 },
                 onPanEnd: (_) {
-                  _mainc = Colors.white;
-                  rebuild(() {});
+                  if (_isMainEvent == true) {
+                    mainColor = Colors.white;
+                    rebuild(() {});
+                  }
                 },
-                onTap: () {},
+                onTap: () {
+                  if (_isMainEvent == true) {}
+                },
                 child: Container(
                   decoration: BoxDecoration(
-                    color: _mainc,
+                    color: mainColor,
                     border: Border(bottom: BorderSide(color: Colors.blue[100], width: 0.5)),
                   ),
                   padding: EdgeInsets.all(10),
@@ -675,17 +712,21 @@ class _ReviewBuilder extends State<ReviewBuilder> {
                       Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
+                          ///左
                           Icon(
                             Icons.ac_unit,
                             color: Colors.blue,
                             size: 26,
                           ),
                           SizedBox(width: 10),
+
+                          ///中
                           //这里必须是Expanded
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: <Widget>[
+                                ///评论者姓名
                                 Row(
                                   children: <Widget>[
                                     Text(
@@ -700,6 +741,8 @@ class _ReviewBuilder extends State<ReviewBuilder> {
                                   ],
                                 ),
                                 SizedBox(height: 5),
+
+                                ///评论内容
                                 RichText(
                                   text: TextSpan(
                                     children: <TextSpan>[
@@ -711,6 +754,8 @@ class _ReviewBuilder extends State<ReviewBuilder> {
                                           height: 1.6,
                                         ),
                                       ),
+
+                                      ///评论时间
                                       TextSpan(
                                         text: " 10:30",
                                         style: TextStyle(
@@ -721,98 +766,17 @@ class _ReviewBuilder extends State<ReviewBuilder> {
                                     ],
                                   ),
                                 ),
+
+                                ///评论的评论
                                 Container(
                                   alignment: Alignment.centerLeft,
                                   color: Colors.grey[100],
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: <Widget>[
-                                      Container(
-                                        padding: EdgeInsets.fromLTRB(10, 10, 10, 10),
-                                        child: StatefulBuilder(
-                                          builder: (_, rebuildIn) {
-                                            return RichText(
-                                              text: TextSpan(
-                                                children: <InlineSpan>[
-                                                  WidgetSpan(
-                                                    child: GestureDetector(
-                                                      child: Text(
-                                                        "aaaaaa",
-                                                        style: TextStyle(color: Colors.blue, backgroundColor: _bc1),
-                                                      ),
-                                                      onPanDown: (_) {
-                                                        _bc1 = Colors.grey[300];
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = true;
-                                                      },
-                                                      onPanCancel: () {
-                                                        _bc1 = null;
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = false;
-                                                      },
-                                                      onPanEnd: (_) {
-                                                        _bc1 = null;
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = false;
-                                                      },
-                                                      onTap: () {
-                                                        //TODO: 跳转到对方个人中心
-                                                      },
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text: ":" + "vvvvv",
-                                                    style: TextStyle(color: Colors.black),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
-                                      Container(
-                                        padding: EdgeInsets.fromLTRB(10, 0, 10, 10),
-                                        child: StatefulBuilder(
-                                          builder: (_, rebuildIn) {
-                                            return RichText(
-                                              text: TextSpan(
-                                                children: <InlineSpan>[
-                                                  WidgetSpan(
-                                                    child: GestureDetector(
-                                                      child: Text(
-                                                        "bbbbbb",
-                                                        style: TextStyle(color: Colors.blue, backgroundColor: _bc2),
-                                                      ),
-                                                      onPanDown: (_) {
-                                                        _bc2 = Colors.grey[300];
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = true;
-                                                      },
-                                                      onPanCancel: () {
-                                                        _bc2 = null;
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = false;
-                                                      },
-                                                      onPanEnd: (_) {
-                                                        _bc2 = null;
-                                                        rebuildIn(() {});
-                                                        _isChildOnPanDown = false;
-                                                      },
-                                                      onTap: () {
-                                                        //TODO: 跳转到对方个人中心
-                                                      },
-                                                    ),
-                                                  ),
-                                                  TextSpan(
-                                                    text: ": ",
-                                                    style: TextStyle(color: Colors.black),
-                                                  ),
-                                                ],
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      ),
+                                      shortReview(),
+                                      shortReview(),
+                                      allReview(),
                                     ],
                                   ),
                                 ),
@@ -820,6 +784,9 @@ class _ReviewBuilder extends State<ReviewBuilder> {
                             ),
                           ),
                           SizedBox(width: 10),
+
+                          ///右
+                          ///赞
                           Column(
                             children: <Widget>[
                               SizedBox(height: 20),
@@ -848,6 +815,142 @@ class _ReviewBuilder extends State<ReviewBuilder> {
         },
         childCount: 10,
       ),
+    );
+  }
+
+  Widget shortReview() {
+    Color nameColor;
+    Color containerColor;
+
+    ///必须默认为true
+    bool isContainerEvent = true;
+
+    return StatefulBuilder(
+      builder: (_, rebuildIn) {
+        return GestureDetector(
+          //让margin的边缘也可点击
+          behavior: HitTestBehavior.translucent,
+          onPanDown: (_) {
+            if (isContainerEvent == true) {
+              containerColor = Colors.grey[300];
+              _isMainEvent = false;
+              rebuildIn(() {});
+            }
+          },
+          onPanCancel: () {
+            if (isContainerEvent == true) {
+              containerColor = null;
+              _isMainEvent = true;
+              rebuildIn(() {});
+            }
+          },
+          onPanEnd: (_) {
+            if (isContainerEvent == true) {
+              containerColor = null;
+              _isMainEvent = true;
+              rebuildIn(() {});
+            }
+          },
+          onTap: () {
+            //TODO: 跳转到对方个人中心
+            if (isContainerEvent == true) {}
+          },
+          child: Container(
+            margin: EdgeInsets.fromLTRB(10, 10, 10, 0),
+            color: containerColor,
+            child: Row(
+              children: <Widget>[
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      children: <InlineSpan>[
+                        WidgetSpan(
+                          child: GestureDetector(
+                            child: Container(
+                              color: nameColor,
+                              child: Text(
+                                "aaad的撒大a",
+                                style: TextStyle(color: Colors.blue),
+                              ),
+                            ),
+                            onPanDown: (_) {
+                              nameColor = Colors.grey[300];
+                              _isMainEvent = false;
+                              isContainerEvent = false;
+                              rebuildIn(() {});
+                            },
+                            onPanCancel: () {
+                              nameColor = null;
+                              _isMainEvent = true;
+                              isContainerEvent = true;
+                              rebuildIn(() {});
+                            },
+                            onPanEnd: (_) {
+                              nameColor = null;
+                              _isMainEvent = true;
+                              isContainerEvent = true;
+                              rebuildIn(() {});
+                            },
+                            onTap: () {
+                              //TODO: 跳转到对方个人中心
+                            },
+                          ),
+                        ),
+                        TextSpan(
+                          text: ":" + "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+                          style: TextStyle(color: Colors.black),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget allReview() {
+    Color bc;
+    return StatefulBuilder(
+      builder: (_, rebuildIn) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: <Widget>[
+              Container(
+                margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
+                color: bc,
+                child: Text(
+                  "查看全部99+条评论",
+                  style: TextStyle(fontSize: 14, color: Colors.blue),
+                ),
+              ),
+            ],
+          ),
+          onPanDown: (_) {
+            bc = Colors.grey[300];
+            _isMainEvent = false;
+            rebuildIn(() {});
+          },
+          onPanCancel: () {
+            bc = null;
+            _isMainEvent = true;
+            rebuildIn(() {});
+          },
+          onPanEnd: (_) {
+            bc = null;
+            _isMainEvent = true;
+            rebuildIn(() {});
+          },
+          onTap: () {
+            //TODO: 跳转到对方个人中心
+          },
+        );
+      },
     );
   }
 }
