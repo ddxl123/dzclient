@@ -42,10 +42,11 @@ class _DZPage extends State<DZPage> {
       query: {
         "dz_id": widget.dzId,
       },
-      responseValue: (code, response) {
+      responseValue: (code, response, isCatch) {
         codeHandles(
-          code,
-          [
+          context: context,
+          code: code,
+          handles: [
             codeHandle(code, ["6001", "6003"], () {
               BotToast.showNotification(title: (_) => Text("服务端异常:$code"));
             }),
@@ -53,6 +54,7 @@ class _DZPage extends State<DZPage> {
               _data = response.data["data"];
             }),
           ],
+          otherCodeHandle: () {},
         );
       },
     );
@@ -77,6 +79,7 @@ class _DZPage extends State<DZPage> {
       case ConnectionState.done:
         return StatefulBuilder(
           builder: (_, rebuild) {
+            initDzContentData();
             return DzContentBuilder(
               data: _data,
               reloadDzContent: () async {
@@ -95,6 +98,15 @@ class _DZPage extends State<DZPage> {
           ),
         );
     }
+  }
+
+  void initDzContentData() {
+    _data["dz_id"] ??= "获取失败";
+    _data["username"] ??= "获取失败";
+    _data["user_icon"] ??= 0;
+    _data["title"] ??= "获取失败";
+    _data["content"] ??= "获取失败";
+    _data["update_time"] ??= 0;
   }
 }
 
@@ -125,11 +137,27 @@ class _DzContentBuilder extends State<DzContentBuilder> {
   TextEditingController _textEditingController = TextEditingController();
   RefreshController _refreshController = RefreshController();
 
-  List<Function(bool)> _hasPullUpFunc = [(bool) {}];
-  List<Function(bool)> _hasSortButtonFunc = [(bool) {}];
-  List<Function(Widget)> _loadWidgetPromptFunc = [(Widget w) {}];
+  int _tabIndex = 1;
 
-  GlobalKey<_AllListBuilderSliver> _allListBuilderSliverGlobalKey = GlobalKey<_AllListBuilderSliver>();
+  Function(Function()) _sortButtonRebuild;
+  Function(Function()) _footerRebuild;
+  Function(Function()) _centerBarRebuild;
+  Function(Function()) _loadPromptRebuild;
+
+  Map _tabBarData = {};
+  Map _tabStarData = {};
+  Map _tabReviewData = {};
+  Map _tabLikeData = {};
+
+  void initTabBarData() {
+    _tabBarData["star_count"] ??= 0;
+    _tabBarData["review_count"] ??= 0;
+    _tabBarData["like_count"] ??= 0;
+  }
+
+  void initTabStarData() {}
+  void initTabReviewData() {}
+  void initTabLikeData() {}
 
   @override
   void dispose() {
@@ -140,24 +168,15 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 
   @override
   Widget build(BuildContext context) {
-    initData();
+    initTabBarData();
+    initTabStarData();
+    initTabReviewData();
+    initTabLikeData();
     return Scaffold(
       appBar: _appBar(),
       body: _allBody(),
       bottomNavigationBar: _bottomNavigationBar(),
     );
-  }
-
-  void initData() {
-    widget.data["dz_id"] ??= "获取失败";
-    widget.data["username"] ??= "获取失败";
-    widget.data["user_icon"] ??= 0;
-    widget.data["title"] ??= "获取失败";
-    widget.data["content"] ??= "获取失败";
-    widget.data["update_time"] ??= 0;
-    widget.data["star_count"] ??= 0;
-    widget.data["like_count"] ??= 0;
-    widget.data["review_count"] ??= 0;
   }
 
   Widget _bottomNavigationBar() {
@@ -191,10 +210,11 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                           "content": _textEditingController.value.text,
                         },
                         route: RouteName.needIdRoutes.dzPage.sendReview,
-                        responseValue: (code, response) {
+                        responseValue: (code, response, isCatch) {
                           codeHandles(
-                            code,
-                            [
+                            context: context,
+                            code: code,
+                            handles: [
                               codeHandle(code, ["7001", "7002"], () {
                                 BotToast.showNotification(title: (_) => Text("服务端错误,请重试,或联系管理员$code"));
                               }),
@@ -203,6 +223,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                                 Navigator.of(context).pop();
                               }),
                             ],
+                            otherCodeHandle: () {},
                           );
                         },
                         isLoading: true,
@@ -258,7 +279,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
           ///dz内容
           _dzContentSliver(),
 
-          ///list导航栏
+          ///centerBar
           _centerBarSliver(),
 
           ///失败提示栏
@@ -268,52 +289,37 @@ class _DzContentBuilder extends State<DzContentBuilder> {
           _sortButtonSliver(),
 
           ///AllListBuilder
-          _allListBuilderSliver(
-            hasPullUpFunc: _hasPullUpFunc,
-            hasSortButtonFunc: _hasSortButtonFunc,
-            loadWidgetPromptFunc: _loadWidgetPromptFunc,
-          )
+          // _allListBuilderSliver()
         ],
       ),
     );
   }
 
   Widget _footer() {
-    ///默认值false
-    bool _hasPullUp = false;
     return CustomFooter(
       loadStyle: LoadStyle.ShowWhenLoading,
       builder: (_, LoadStatus loadStatus) {
-        Widget _pullUpTrueWidget;
-        Widget _pullUpWidget;
+        Widget pullUpWidget;
         if (loadStatus == LoadStatus.idle) {
-          _pullUpTrueWidget = Text("上拉加载");
+          pullUpWidget = Text("上拉加载");
         } else if (loadStatus == LoadStatus.loading) {
-          _pullUpTrueWidget = CircularProgressIndicator();
+          pullUpWidget = CircularProgressIndicator();
         } else if (loadStatus == LoadStatus.failed) {
-          _pullUpTrueWidget = Text("加载失败！点击重试！");
+          pullUpWidget = Text("加载失败！点击重试！");
         } else if (loadStatus == LoadStatus.canLoading) {
-          _pullUpTrueWidget = Text("松手,加载更多!");
+          pullUpWidget = Text("松手,加载更多!");
         } else {
-          _pullUpTrueWidget = Text("没有更多数据了!");
+          pullUpWidget = Text("没有更多数据了!");
         }
 
         return StatefulBuilder(
-          builder: (_, _footerRebuild) {
-            _hasPullUpFunc[0] = (bool hasPU) {
-              _hasPullUp = hasPU;
-              _footerRebuild(() {});
-            };
-            if (_hasPullUp == true) {
-              _pullUpWidget = _pullUpTrueWidget;
-            } else {
-              _pullUpWidget = Container();
-              //写上这一句，防止在false的时候出现空占位
-              _refreshController.loadComplete();
-            }
+          builder: (_, footerRebuild) {
+            _footerRebuild = footerRebuild;
+            //写上这一句，防止在false的时候出现空占位
+            _refreshController.loadComplete();
             return Container(
               child: Center(
-                child: _pullUpWidget,
+                child: pullUpWidget,
               ),
             );
           },
@@ -365,86 +371,128 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 
   ///centerBar
   Widget _centerBarSliver() {
-    return SliverAppBar(
-      automaticallyImplyLeading: false,
-      pinned: true,
-      snap: true,
-      floating: true,
-      centerTitle: true,
-      actions: <Widget>[
-        GestureDetector(
-          child: Container(
-            padding: EdgeInsets.all(10),
-            alignment: Alignment.center,
-            child: Text(
-              "收藏 · " + (widget.data["star_count"] > 99 ? "99+" : widget.data["star_count"].toString()),
-              style: TextStyle(fontSize: 15),
+    return StatefulBuilder(
+      builder: (_, centerBarRebuild) {
+        _centerBarRebuild = centerBarRebuild;
+        //无需判断_tabIndex
+        return SliverAppBar(
+          automaticallyImplyLeading: false,
+          pinned: true,
+          snap: true,
+          floating: true,
+          centerTitle: true,
+          actions: <Widget>[
+            GestureDetector(
+              child: Container(
+                padding: EdgeInsets.all(10),
+                alignment: Alignment.center,
+                child: Text(
+                  "收藏 · " + (_tabBarData["star_count"] > 99 ? "99+" : _tabBarData["star_count"].toString()),
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              onTap: () {
+                _toTab(0);
+              },
             ),
-          ),
-          onTap: () {
-            _allListBuilderSliverGlobalKey.currentState.toTab(0);
-          },
-        ),
-        GestureDetector(
-          child: Container(
-            padding: EdgeInsets.all(10),
-            alignment: Alignment.center,
-            child: Text(
-              "评论 · " + (widget.data["review_count"] > 99 ? "99+" : widget.data["review_count"].toString()),
-              style: TextStyle(fontSize: 15),
+            GestureDetector(
+              child: Container(
+                padding: EdgeInsets.all(10),
+                alignment: Alignment.center,
+                child: Text(
+                  "评论 · " + (_tabBarData["review_count"] > 99 ? "99+" : _tabBarData["review_count"].toString()),
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              onTap: () {
+                _toTab(1);
+              },
             ),
-          ),
-          onTap: () {
-            _allListBuilderSliverGlobalKey.currentState.toTab(1);
-          },
-        ),
-        Expanded(child: Container()),
-        GestureDetector(
-          child: Container(
-            padding: EdgeInsets.all(10),
-            alignment: Alignment.center,
-            child: Text(
-              "喜欢 · " + (widget.data["like_count"] > 99 ? "99+" : widget.data["like_count"].toString()),
-              style: TextStyle(fontSize: 15),
+            Expanded(child: Container()),
+            GestureDetector(
+              child: Container(
+                padding: EdgeInsets.all(10),
+                alignment: Alignment.center,
+                child: Text(
+                  "喜欢 · " + (_tabBarData["like_count"] > 99 ? "99+" : _tabBarData["like_count"].toString()),
+                  style: TextStyle(fontSize: 15),
+                ),
+              ),
+              onTap: () {
+                _toTab(2);
+              },
             ),
-          ),
-          onTap: () {
-            _allListBuilderSliverGlobalKey.currentState.toTab(2);
-          },
-        ),
-      ],
+          ],
+        );
+      },
     );
+  }
+
+  void _toTab(int index) {
+    _tabIndex = index;
+    _centerBarRebuild(() {});
+    _loadPromptRebuild(() {});
+    _sortButtonRebuild(() {});
+    _footerRebuild(() {});
   }
 
   ///加载提示栏
   Widget _loadPromptSliver() {
-    ///默认值false
-    Widget loadPromptWidget = Container();
     return SliverToBoxAdapter(
       child: StatefulBuilder(
-        builder: (_, failPromptRebuild) {
-          _loadWidgetPromptFunc[0] = (Widget w) {
-            loadPromptWidget = w;
-            failPromptRebuild(() {});
-          };
-          return loadPromptWidget;
+        builder: (_, loadPromptRebuild) {
+          _loadPromptRebuild = loadPromptRebuild;
+          //无需判断_tabIndex
+          return FutureBuilder(
+            future: _loadPromptFuture(),
+            builder: (_, AsyncSnapshot snapshot) {
+              Widget body;
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                body = Center(child: CircularProgressIndicator());
+              } else if (snapshot.connectionState == ConnectionState.done) {
+                body = Container();
+                //if成功
+              }
+              return body;
+            },
+          );
         },
       ),
     );
   }
 
+  Future _loadPromptFuture() {
+    if (_tabIndex == 0) {
+      return SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getStar,
+        responseValue: (code, response, isCatch) {},
+      );
+    } else if (_tabIndex == 2) {
+      return SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getLike,
+        responseValue: (code, response, isCatch) {},
+      );
+    } else {
+      return SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getReview1,
+        responseValue: (code, response, isCatch) {},
+      );
+    }
+  }
+
   ///sort栏
   Widget _sortButtonSliver() {
-    ///默认值false
-    bool _hasSortButton = false;
     return SliverToBoxAdapter(
       child: StatefulBuilder(
-        builder: (adapterContext, adapterRebuild) {
-          _hasSortButtonFunc[0] = (bool hasSB) {
-            _hasSortButton = hasSB;
-            adapterRebuild(() {});
-          };
-          if (_hasSortButton == false) {
+        builder: (_, sortButtonRebuild) {
+          _sortButtonRebuild = sortButtonRebuild;
+          if (_tabIndex == 0 || _tabIndex == 2) {
             return Container();
           }
           return Row(
@@ -502,19 +550,12 @@ class _DzContentBuilder extends State<DzContentBuilder> {
   }
 
   //AllListBuilder
-  Widget _allListBuilderSliver({
-    @required List<Function(bool)> hasPullUpFunc,
-    @required List<Function(bool)> hasSortButtonFunc,
-    @required List<Function(Widget)> loadWidgetPromptFunc,
-  }) {
-    return AllListBuilderSliver(
-      dzId: widget.data["dz_id"],
-      hasPullUpFunc: hasPullUpFunc,
-      hasSortButtonFunc: hasSortButtonFunc,
-      loadWidgetPromptFunc: loadWidgetPromptFunc,
-      key: _allListBuilderSliverGlobalKey,
-    );
-  }
+  // Widget _allListBuilderSliver() {
+  //   return AllListBuilderSliver(
+  //     dzId: widget.data["dz_id"],
+  //     key: _allListBuilderSliverGlobalKey,
+  //   );
+  // }
 }
 
 ///
@@ -530,15 +571,9 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 class AllListBuilderSliver extends StatefulWidget {
   AllListBuilderSliver({
     @required this.dzId,
-    @required this.hasPullUpFunc,
-    @required this.hasSortButtonFunc,
-    @required this.loadWidgetPromptFunc,
     @required Key key,
   }) : super(key: key);
   final String dzId;
-  final List<Function(bool)> hasPullUpFunc;
-  final List<Function(bool)> hasSortButtonFunc;
-  final List<Function(Widget)> loadWidgetPromptFunc;
 
   @override
   State<StatefulWidget> createState() {
@@ -562,35 +597,11 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
   }
 
   ///失败返回false，成功则返回其数据
-  Future _future() {
-    if (_tabIndex == 0) {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getStar,
-        responseValue: (code, response) {},
-      );
-    } else if (_tabIndex == 2) {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getLike,
-        responseValue: (code, response) {},
-      );
-    } else {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getReview1,
-        responseValue: (code, response) {},
-      );
-    }
-  }
+  Future _future() {}
 
   Widget _builder(_, AsyncSnapshot snapshot) {
     switch (snapshot.connectionState) {
       case ConnectionState.waiting:
-        _futureWaiting();
         return SliverToBoxAdapter(
           child: Column(
             children: <Widget>[
@@ -602,55 +613,13 @@ class _AllListBuilderSliver extends State<AllListBuilderSliver> {
         break;
       case ConnectionState.done:
         if (snapshot.data == false) {
-          _futureFail();
-        } else {
-          _futureSuccess();
-        }
+        } else {}
         return ReviewBuilder();
       default:
-        print("default");
-        _futureFail();
         return SliverToBoxAdapter(
           child: Container(),
         );
     }
-  }
-
-  void _futureWaiting() {
-    WidgetsBinding widgetsBinding = WidgetsBinding.instance;
-    widgetsBinding.addPostFrameCallback((timeStamp) {
-      widget.hasPullUpFunc[0](false);
-      widget.hasSortButtonFunc[0](false);
-      widget.loadWidgetPromptFunc[0](Container());
-    });
-  }
-
-  void _futureSuccess() {
-    WidgetsBinding widgetsBinding = WidgetsBinding.instance;
-    widgetsBinding.addPostFrameCallback((timeStamp) {
-      if (_tabIndex == 0) {
-        widget.hasPullUpFunc[0](true);
-        widget.hasSortButtonFunc[0](false);
-        widget.loadWidgetPromptFunc[0](Container());
-      } else if (_tabIndex == 2) {
-        widget.hasPullUpFunc[0](true);
-        widget.hasSortButtonFunc[0](false);
-        widget.loadWidgetPromptFunc[0](Container());
-      } else {
-        widget.hasPullUpFunc[0](true);
-        widget.hasSortButtonFunc[0](true);
-        widget.loadWidgetPromptFunc[0](Container());
-      }
-    });
-  }
-
-  void _futureFail() {
-    WidgetsBinding widgetsBinding = WidgetsBinding.instance;
-    widgetsBinding.addPostFrameCallback((timeStamp) {
-      widget.hasPullUpFunc[0](false);
-      widget.hasSortButtonFunc[0](false);
-      widget.loadWidgetPromptFunc[0](Container());
-    });
   }
 }
 

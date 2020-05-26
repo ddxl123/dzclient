@@ -110,25 +110,30 @@ class _BuildDZContent extends State<BuildDZContent> {
           }
         })(),
       },
-      responseValue: (code, responseValue) {
-        codeHandles(code, [
-          codeHandle(code, ["5001", "5003", "5005"], () {
-            BotToast.showNotification(title: (_) => Text("获取数据失败$code"));
-          }),
-          codeHandle(code, ["5002"], () {
-            if (responseValue.data["data"] == null) {
-              BotToast.showNotification(title: (_) => Text("获取数据失败"));
-              return;
-            }
-            if (isMore) {
-              _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
-            } else {
-              _data.clear();
-              _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
-            }
-            setState(() {});
-          }),
-        ]);
+      responseValue: (code, responseValue, isCatch) {
+        codeHandles(
+          context: context,
+          code: code,
+          handles: [
+            codeHandle(code, ["5001", "5003", "5005"], () {
+              BotToast.showNotification(title: (_) => Text("获取数据失败$code"));
+            }),
+            codeHandle(code, ["5002"], () {
+              if (responseValue.data["data"] == null) {
+                BotToast.showNotification(title: (_) => Text("获取数据失败"));
+                return;
+              }
+              if (isMore) {
+                _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
+              } else {
+                _data.clear();
+                _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
+              }
+              setState(() {});
+            }),
+          ],
+          otherCodeHandle: () {},
+        );
       },
       bindLine: "1",
     );

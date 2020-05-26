@@ -2,9 +2,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:connectivity/connectivity.dart';
 import 'package:dio/dio.dart';
 import 'package:dzclient/bi/CheckNetwork.dart';
-import 'package:dzclient/bi/CodeHandle.dart';
 import 'package:dzclient/bi/SP.dart';
-import 'package:dzclient/person/LoginPage.dart';
 import 'package:flutter/material.dart';
 
 class SendRequest {
@@ -34,7 +32,7 @@ class SendRequest {
     @required String route,
     Map<dynamic, dynamic> data,
     Map<String, dynamic> query,
-    @required Function(String, Response<dynamic>) responseValue,
+    @required Function(String, Response<dynamic>, bool) responseValue,
     String bindLine,
     bool isLoading = false,
   }) async {
@@ -59,8 +57,13 @@ class SendRequest {
     ///发送请求
     BotToast.showNotification(title: (_) => Text("正在发送..."));
 
+    ///响应数据，包含捕获的错误的情况
+    String handleCode;
+    Response<dynamic> handleResponse;
+    bool handleIsCatch = false;
+
     ///TODO: 耗时测试，可移除
-    // await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(Duration(seconds: 2));
 
     await _dio
         .request(
@@ -71,40 +74,13 @@ class SendRequest {
     )
         .then(
       (onValue) {
-        String code = onValue.data["code"];
-        code = code ?? "null";
-        codeHandles(
-          code,
-          [
-            codeHandle(code, ["2001", "2002", "2003"], () {
-              //检查是否登陆过
-              if (SP.sp.getString("token") == null) {
-                BotToast.showNotification(title: (_) => Text("请先登陆"));
-                showLoginPage(context);
-              } else {
-                BotToast.showNotification(title: (_) => Text("登陆已过期，请重新登陆$code"));
-                showLoginPage(context);
-              }
-            }),
-            codeHandle(code, ["2004"], () {
-              BotToast.showNotification(title: (_) => Text("服务器端异常，请重试$code"));
-            }),
-            codeHandle(code, ["2005"], () {
-              BotToast.showNotification(
-                //TODO: 这里要将用户名存储本地，然后在这里获取
-                title: (_) => Text(
-                  "数据库丢失该 @XXX 用户$code，请记住您的用户名，并及时联系管理员!\n\n已自动复制您的用户名。",
-                ),
-              );
-            })
-          ],
-          elseHandle: () {
-            responseValue(code, onValue);
-          },
-        );
+        handleCode = onValue.data["code"];
+        handleResponse = onValue;
       },
     ).catchError(
       (onError) {
+        handleIsCatch = true;
+
         ///综合异常处理
         if (onError.runtimeType == DioError) {
           switch (onError.type) {
@@ -120,7 +96,9 @@ class SendRequest {
           print(onError);
         }
       },
-    );
+    ).whenComplete(() {
+      responseValue(handleCode, handleResponse, handleIsCatch);
+    });
 
     entry?.remove();
     if (bindLine != null) {

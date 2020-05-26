@@ -146,7 +146,7 @@ List<Widget> loginContent(loginContext) {
                   "username": usernameValue,
                   "password": passwordValue,
                 },
-                responseValue: (code, responseData) {
+                responseValue: (code, responseData, isCatch) {
                   handleLoginResponse(loginContext, code, responseData);
                 },
                 isLoading: true,
@@ -174,7 +174,7 @@ List<Widget> loginContent(loginContext) {
                   "username": usernameValue,
                   "password": passwordValue,
                 },
-                responseValue: (code, responseData) {
+                responseValue: (code, responseData, isCatch) {
                   handleRegisterResponse(loginContext, code, responseData);
                 },
                 isLoading: true,
@@ -189,8 +189,9 @@ List<Widget> loginContent(loginContext) {
 
 void handleLoginResponse(BuildContext loginContext, String code, Response<dynamic> responseData) {
   codeHandles(
-    code,
-    [
+    context: loginContext,
+    code: code,
+    handles: [
       codeHandle(code, ["1001", "1002", "1003", "1005", "1006"], () {
         BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
       }),
@@ -207,13 +208,15 @@ void handleLoginResponse(BuildContext loginContext, String code, Response<dynami
         BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
       }),
     ],
+    otherCodeHandle: () {},
   );
 }
 
 void handleRegisterResponse(BuildContext loginContext, String code, Response<dynamic> responseData) {
   codeHandles(
-    code,
-    [
+    context: loginContext,
+    code: code,
+    handles: [
       codeHandle(code, ["3001", "3002", "3003", "3004"], () {
         BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
       }),
@@ -230,6 +233,7 @@ void handleRegisterResponse(BuildContext loginContext, String code, Response<dyn
         BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
       })
     ],
+    otherCodeHandle: () {},
   );
 }
 

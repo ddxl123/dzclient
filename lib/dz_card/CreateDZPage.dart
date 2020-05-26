@@ -110,10 +110,11 @@ class _CreateDZPage extends State<CreateDZPage> {
                   "title": _titleController.text,
                   "content": _contentController.text,
                 },
-                responseValue: (code, responseData) {
+                responseValue: (code, responseData, isCatch) {
                   codeHandles(
-                    code,
-                    [
+                    context: context,
+                    code: code,
+                    handles: [
                       codeHandle(code, ["4001", "4002"], () {
                         BotToast.showNotification(title: (_) => Text("服务器端异常$code,请联系管理员!"));
                       }),
@@ -122,6 +123,7 @@ class _CreateDZPage extends State<CreateDZPage> {
                         Navigator.pop(context);
                       }),
                     ],
+                    otherCodeHandle: () {},
                   );
                 },
                 isLoading: true,
