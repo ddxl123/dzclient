@@ -1,7 +1,7 @@
 import 'dart:ui';
 
 import 'package:bot_toast/bot_toast.dart';
-import 'package:dzclient/bi/CodeHandle.dart';
+import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/RouteName.dart';
 import 'package:dzclient/bi/SendRequest.dart';
 import 'package:flutter/material.dart';
@@ -110,22 +110,19 @@ class _CreateDZPage extends State<CreateDZPage> {
                   "title": _titleController.text,
                   "content": _contentController.text,
                 },
-                responseValue: (code, responseData, isCatch) {
-                  codeHandles(
-                    context: context,
-                    code: code,
-                    handles: [
-                      codeHandle(code, ["4001", "4002"], () {
-                        BotToast.showNotification(title: (_) => Text("服务器端异常$code,请联系管理员!"));
-                      }),
-                      codeHandle(code, ["4003"], () {
-                        BotToast.showNotification(title: (_) => Text("发布成功"));
-                        Navigator.pop(context);
-                      }),
-                    ],
-                    otherCodeHandle: () {},
-                  );
+                toCodeHandles: (code, response) {
+                  return [
+                    codeHandles(code, ["4001", "4002"], () {
+                      BotToast.showNotification(title: (_) => Text("服务器端异常$code,请联系管理员!"));
+                    }),
+                    codeHandles(code, ["4003"], () {
+                      BotToast.showNotification(title: (_) => Text("发布成功"));
+                      Navigator.pop(context);
+                    }),
+                  ];
                 },
+                toOtherCodeHandles: () {},
+                bindLine: "CreateDZPage",
                 isLoading: true,
               );
             },

@@ -1,6 +1,6 @@
 import 'package:bot_toast/bot_toast.dart';
 import 'package:dio/dio.dart';
-import 'package:dzclient/bi/CodeHandle.dart';
+import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/RouteName.dart';
 import 'package:dzclient/bi/SP.dart';
 import 'package:dzclient/bi/SendRequest.dart';
@@ -146,9 +146,11 @@ List<Widget> loginContent(loginContext) {
                   "username": usernameValue,
                   "password": passwordValue,
                 },
-                responseValue: (code, responseData, isCatch) {
-                  handleLoginResponse(loginContext, code, responseData);
+                toCodeHandles: (code, response) {
+                  return handleLoginResponse(loginContext, code, response);
                 },
+                toOtherCodeHandles: () {},
+                bindLine: "login",
                 isLoading: true,
               );
             },
@@ -174,9 +176,11 @@ List<Widget> loginContent(loginContext) {
                   "username": usernameValue,
                   "password": passwordValue,
                 },
-                responseValue: (code, responseData, isCatch) {
-                  handleRegisterResponse(loginContext, code, responseData);
+                toCodeHandles: (code, response) {
+                  return handleRegisterResponse(loginContext, code, response);
                 },
+                toOtherCodeHandles: () {},
+                bindLine: "login",
                 isLoading: true,
               );
             },
@@ -187,58 +191,56 @@ List<Widget> loginContent(loginContext) {
   ];
 }
 
-void handleLoginResponse(BuildContext loginContext, String code, Response<dynamic> responseData) {
-  codeHandles(
-    context: loginContext,
-    code: code,
-    handles: [
-      codeHandle(code, ["1001", "1002", "1003", "1005", "1006"], () {
-        BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
-      }),
-      codeHandle(code, ["1004"], () {
-        BotToast.showNotification(title: (_) => Text("该用户未被注册过"));
-      }),
-      codeHandle(code, ["1007"], () {
-        toSetTokenLocal(loginContext, responseData, true);
-      }),
-      codeHandle(code, ["1008"], () {
-        BotToast.showNotification(title: (_) => Text("密码错误"));
-      }),
-      codeHandle(code, ["1009"], () {
-        BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
-      }),
-    ],
-    otherCodeHandle: () {},
-  );
+List<bool> handleLoginResponse(
+  BuildContext loginContext,
+  String code,
+  Response<dynamic> response,
+) {
+  return [
+    codeHandles(code, ["1001", "1002", "1003", "1005", "1006"], () {
+      BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
+    }),
+    codeHandles(code, ["1004"], () {
+      BotToast.showNotification(title: (_) => Text("该用户未被注册过"));
+    }),
+    codeHandles(code, ["1007"], () {
+      toSetTokenLocal(loginContext, response, true);
+    }),
+    codeHandles(code, ["1008"], () {
+      BotToast.showNotification(title: (_) => Text("密码错误"));
+    }),
+    codeHandles(code, ["1009"], () {
+      BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
+    }),
+  ];
 }
 
-void handleRegisterResponse(BuildContext loginContext, String code, Response<dynamic> responseData) {
-  codeHandles(
-    context: loginContext,
-    code: code,
-    handles: [
-      codeHandle(code, ["3001", "3002", "3003", "3004"], () {
-        BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
-      }),
-      codeHandle(code, ["3005", "3006"], () {
-        BotToast.showNotification(title: (_) => Text("注册成功，但登陆失败$code"));
-      }),
-      codeHandle(code, ["3007"], () {
-        toSetTokenLocal(loginContext, responseData, false);
-      }),
-      codeHandle(code, ["3008"], () {
-        BotToast.showNotification(title: (_) => Text("该用户已存在"));
-      }),
-      codeHandle(code, ["3009"], () {
-        BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
-      })
-    ],
-    otherCodeHandle: () {},
-  );
+List<bool> handleRegisterResponse(
+  BuildContext loginContext,
+  String code,
+  Response<dynamic> response,
+) {
+  return [
+    codeHandles(code, ["3001", "3002", "3003", "3004"], () {
+      BotToast.showNotification(title: (_) => Text("服务器端错误$code，请联系管理员"));
+    }),
+    codeHandles(code, ["3005", "3006"], () {
+      BotToast.showNotification(title: (_) => Text("注册成功，但登陆失败$code"));
+    }),
+    codeHandles(code, ["3007"], () {
+      toSetTokenLocal(loginContext, response, false);
+    }),
+    codeHandles(code, ["3008"], () {
+      BotToast.showNotification(title: (_) => Text("该用户已存在"));
+    }),
+    codeHandles(code, ["3009"], () {
+      BotToast.showNotification(title: (_) => Text("数据库存在重复的用户账号$code，请联系管理员"));
+    })
+  ];
 }
 
-void toSetTokenLocal(BuildContext context, Response<dynamic> responseData, bool isLogin) {
-  SP.sp.setString("token", responseData.headers["token"][0].toString()).then((onValue) {
+void toSetTokenLocal(BuildContext context, Response<dynamic> response, bool isLogin) {
+  SP.sp.setString("token", response.headers["token"][0].toString()).then((onValue) {
     Navigator.pop(context);
     BotToast.showNotification(title: (_) => Text(isLogin ? "登陆成功" : "注册成功"));
   }).catchError((onError) {

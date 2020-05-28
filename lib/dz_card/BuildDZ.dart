@@ -1,5 +1,5 @@
 import 'package:bot_toast/bot_toast.dart';
-import 'package:dzclient/bi/CodeHandle.dart';
+import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/RouteName.dart';
 import 'package:dzclient/bi/SendRequest.dart';
 import 'package:dzclient/dz_card/ShortDZ.dart';
@@ -110,32 +110,29 @@ class _BuildDZContent extends State<BuildDZContent> {
           }
         })(),
       },
-      responseValue: (code, responseValue, isCatch) {
-        codeHandles(
-          context: context,
-          code: code,
-          handles: [
-            codeHandle(code, ["5001", "5003", "5005"], () {
-              BotToast.showNotification(title: (_) => Text("获取数据失败$code"));
-            }),
-            codeHandle(code, ["5002"], () {
-              if (responseValue.data["data"] == null) {
-                BotToast.showNotification(title: (_) => Text("获取数据失败"));
-                return;
-              }
-              if (isMore) {
-                _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
-              } else {
-                _data.clear();
-                _data.addAll((responseValue.data["data"] as List<dynamic>).cast());
-              }
-              setState(() {});
-            }),
-          ],
-          otherCodeHandle: () {},
-        );
+      toCodeHandles: (code, response) {
+        return [
+          codeHandles(code, ["5001", "5003", "5005"], () {
+            BotToast.showNotification(title: (_) => Text("获取数据失败$code"));
+          }),
+          codeHandles(code, ["5002"], () {
+            if (response.data["data"] == null) {
+              BotToast.showNotification(title: (_) => Text("获取数据失败"));
+              return;
+            }
+            if (isMore) {
+              _data.addAll((response.data["data"] as List<dynamic>).cast());
+            } else {
+              _data.clear();
+              _data.addAll((response.data["data"] as List<dynamic>).cast());
+            }
+            setState(() {});
+          }),
+        ];
       },
+      toOtherCodeHandles: () {},
       bindLine: "1",
+      isLoading: false,
     );
   }
 }

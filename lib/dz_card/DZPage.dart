@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:bot_toast/bot_toast.dart';
-import 'package:dzclient/bi/CodeHandle.dart';
+import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/RouteName.dart';
 import 'package:dzclient/bi/SendRequest.dart';
 import 'package:dzclient/handles/UserIcons.dart';
@@ -11,6 +11,8 @@ import 'package:dzclient/tools/ShowReview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
+
+enum CenterTabBarType { star, review, like }
 
 class DZPage extends StatefulWidget {
   DZPage(this.dzId);
@@ -22,7 +24,7 @@ class DZPage extends StatefulWidget {
 }
 
 class _DZPage extends State<DZPage> {
-  Map _data = {};
+  Map _dzContentData = {};
 
   @override
   Widget build(BuildContext context) {
@@ -42,21 +44,19 @@ class _DZPage extends State<DZPage> {
       query: {
         "dz_id": widget.dzId,
       },
-      responseValue: (code, response, isCatch) {
-        codeHandles(
-          context: context,
-          code: code,
-          handles: [
-            codeHandle(code, ["6001", "6003"], () {
-              BotToast.showNotification(title: (_) => Text("服务端异常:$code"));
-            }),
-            codeHandle(code, ["6002"], () {
-              _data = response.data["data"];
-            }),
-          ],
-          otherCodeHandle: () {},
-        );
+      toCodeHandles: (code, response) {
+        return [
+          codeHandles(code, ["6001", "6003"], () {
+            BotToast.showNotification(title: (_) => Text("服务端异常:$code"));
+          }),
+          codeHandles(code, ["6002"], () {
+            _dzContentData = response.data["data"];
+          }),
+        ];
       },
+      toOtherCodeHandles: () {},
+      bindLine: "DzContent",
+      isLoading: false,
     );
   }
 
@@ -81,7 +81,7 @@ class _DZPage extends State<DZPage> {
           builder: (_, rebuild) {
             initDzContentData();
             return DzContentBuilder(
-              data: _data,
+              dzContentData: _dzContentData,
               reloadDzContent: () async {
                 await _future();
                 rebuild(() {});
@@ -101,12 +101,12 @@ class _DZPage extends State<DZPage> {
   }
 
   void initDzContentData() {
-    _data["dz_id"] ??= "获取失败";
-    _data["username"] ??= "获取失败";
-    _data["user_icon"] ??= 0;
-    _data["title"] ??= "获取失败";
-    _data["content"] ??= "获取失败";
-    _data["update_time"] ??= 0;
+    _dzContentData["dz_id"] ??= "获取失败";
+    _dzContentData["username"] ??= "获取失败";
+    _dzContentData["user_icon"] ??= 0;
+    _dzContentData["title"] ??= "获取失败";
+    _dzContentData["content"] ??= "获取失败";
+    _dzContentData["update_time"] ??= 0;
   }
 }
 
@@ -121,9 +121,9 @@ class _DZPage extends State<DZPage> {
 ///
 ///
 class DzContentBuilder extends StatefulWidget {
-  DzContentBuilder({this.data, this.reloadDzContent});
+  DzContentBuilder({this.dzContentData, this.reloadDzContent});
   // widget.data不会为null,因为已经有默认值{}了
-  final Map data;
+  final Map dzContentData;
   //要用reloadDzContent替代当前类的setState，因为需要data重新初始化
   final Function reloadDzContent;
 
@@ -137,27 +137,31 @@ class _DzContentBuilder extends State<DzContentBuilder> {
   TextEditingController _textEditingController = TextEditingController();
   RefreshController _refreshController = RefreshController();
 
-  int _tabIndex = 1;
+  //初始值是review
+  CenterTabBarType _currentCenterTabBarType = CenterTabBarType.review;
 
   Function(Function()) _sortButtonRebuild;
   Function(Function()) _footerRebuild;
-  Function(Function()) _centerBarRebuild;
+  Function(Function()) _centerTabBarRebuild;
   Function(Function()) _loadPromptRebuild;
+  Function(Function()) _allListBuilderRebuild;
 
-  Map _tabBarData = {};
-  Map _tabStarData = {};
-  Map _tabReviewData = {};
-  Map _tabLikeData = {};
+  bool _isLoadPromptDisplay = false;
 
-  void initTabBarData() {
-    _tabBarData["star_count"] ??= 0;
-    _tabBarData["review_count"] ??= 0;
-    _tabBarData["like_count"] ??= 0;
+  Map _centerTabBarData = {};
+  Map _starData = {};
+  Map _reviewData = {};
+  Map _likeData = {};
+
+  void _initCenterTabBarData() {
+    _centerTabBarData["star_count"] ??= 0;
+    _centerTabBarData["review_count"] ??= 0;
+    _centerTabBarData["like_count"] ??= 0;
   }
 
-  void initTabStarData() {}
-  void initTabReviewData() {}
-  void initTabLikeData() {}
+  void _initStarData() {}
+  void _initReviewData() {}
+  void _initLikeData() {}
 
   @override
   void dispose() {
@@ -168,10 +172,6 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 
   @override
   Widget build(BuildContext context) {
-    initTabBarData();
-    initTabStarData();
-    initTabReviewData();
-    initTabLikeData();
     return Scaffold(
       appBar: _appBar(),
       body: _allBody(),
@@ -199,34 +199,31 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                   showReview(
                     context: context,
                     textEditingController: _textEditingController,
-                    speakToWho: widget.data["username"],
+                    speakToWho: widget.dzContentData["username"],
                     onSend: () {
                       SendRequest.request(
                         context: context,
                         method: "POST",
                         data: {
                           //给谁评论
-                          "dz_id": widget.data["dz_id"],
+                          "dz_id": widget.dzContentData["dz_id"],
                           "content": _textEditingController.value.text,
                         },
                         route: RouteName.needIdRoutes.dzPage.sendReview,
-                        responseValue: (code, response, isCatch) {
-                          codeHandles(
-                            context: context,
-                            code: code,
-                            handles: [
-                              codeHandle(code, ["7001", "7002"], () {
-                                BotToast.showNotification(title: (_) => Text("服务端错误,请重试,或联系管理员$code"));
-                              }),
-                              codeHandle(code, ["7003"], () {
-                                BotToast.showNotification(title: (_) => Text("发表成功"));
-                                Navigator.of(context).pop();
-                              }),
-                            ],
-                            otherCodeHandle: () {},
-                          );
+                        toCodeHandles: (code, response) {
+                          return [
+                            codeHandles(code, ["7001", "7002"], () {
+                              BotToast.showNotification(title: (_) => Text("服务端错误,请重试,或联系管理员$code"));
+                            }),
+                            codeHandles(code, ["7003"], () {
+                              BotToast.showNotification(title: (_) => Text("发表成功"));
+                              Navigator.of(context).pop();
+                            }),
+                          ];
                         },
+                        toOtherCodeHandles: () {},
                         isLoading: true,
+                        bindLine: "SendReview",
                       );
                     },
                   );
@@ -250,8 +247,8 @@ class _DzContentBuilder extends State<DzContentBuilder> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
-            UserIcons.getUserIconWidget(widget.data["user_icon"]),
-            Text(widget.data["username"]),
+            UserIcons.getUserIconWidget(widget.dzContentData["user_icon"]),
+            Text(widget.dzContentData["username"]),
           ],
         ),
         onTap: () {},
@@ -280,9 +277,9 @@ class _DzContentBuilder extends State<DzContentBuilder> {
           _dzContentSliver(),
 
           ///centerBar
-          _centerBarSliver(),
+          _centerTabBarSliver(),
 
-          ///失败提示栏
+          ///加载栏
           _loadPromptSliver(),
 
           ///sort栏
@@ -338,7 +335,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
             padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
             alignment: Alignment.centerLeft,
             child: Text(
-              widget.data["title"],
+              widget.dzContentData["title"],
               style: TextStyle(fontSize: 18),
             ),
           ),
@@ -347,7 +344,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
             padding: EdgeInsets.all(15),
             alignment: Alignment.centerLeft,
             child: Text(
-              widget.data["content"],
+              widget.dzContentData["content"],
               style: TextStyle(fontSize: 14, height: 1.8),
             ),
           ),
@@ -356,7 +353,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
             alignment: Alignment.center,
             padding: EdgeInsets.all(10),
             child: Text(
-              "发布于 " + widget.data["update_time"].toString(),
+              "发布于 " + widget.dzContentData["update_time"].toString(),
               style: TextStyle(
                 fontSize: 12,
                 height: 2,
@@ -369,12 +366,16 @@ class _DzContentBuilder extends State<DzContentBuilder> {
     );
   }
 
-  ///centerBar
-  Widget _centerBarSliver() {
+  ///centerTabBar
+  Widget _centerTabBarSliver() {
     return StatefulBuilder(
-      builder: (_, centerBarRebuild) {
-        _centerBarRebuild = centerBarRebuild;
-        //无需判断_tabIndex
+      builder: (_, centerTabBarRebuild) {
+        _centerTabBarRebuild = centerTabBarRebuild;
+
+        ///每次被rebuild,都要重新初始化一次数据
+        _initCenterTabBarData();
+
+        ///无需判断_tabIndex
         return SliverAppBar(
           automaticallyImplyLeading: false,
           pinned: true,
@@ -387,12 +388,12 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                 padding: EdgeInsets.all(10),
                 alignment: Alignment.center,
                 child: Text(
-                  "收藏 · " + (_tabBarData["star_count"] > 99 ? "99+" : _tabBarData["star_count"].toString()),
+                  "收藏 · " + (_centerTabBarData["star_count"] > 99 ? "99+" : _centerTabBarData["star_count"].toString()),
                   style: TextStyle(fontSize: 15),
                 ),
               ),
               onTap: () {
-                _toTab(0);
+                _toTabBar(CenterTabBarType.star);
               },
             ),
             GestureDetector(
@@ -400,12 +401,12 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                 padding: EdgeInsets.all(10),
                 alignment: Alignment.center,
                 child: Text(
-                  "评论 · " + (_tabBarData["review_count"] > 99 ? "99+" : _tabBarData["review_count"].toString()),
+                  "评论 · " + (_centerTabBarData["review_count"] > 99 ? "99+" : _centerTabBarData["review_count"].toString()),
                   style: TextStyle(fontSize: 15),
                 ),
               ),
               onTap: () {
-                _toTab(1);
+                _toTabBar(CenterTabBarType.review);
               },
             ),
             Expanded(child: Container()),
@@ -414,12 +415,12 @@ class _DzContentBuilder extends State<DzContentBuilder> {
                 padding: EdgeInsets.all(10),
                 alignment: Alignment.center,
                 child: Text(
-                  "喜欢 · " + (_tabBarData["like_count"] > 99 ? "99+" : _tabBarData["like_count"].toString()),
+                  "喜欢 · " + (_centerTabBarData["like_count"] > 99 ? "99+" : _centerTabBarData["like_count"].toString()),
                   style: TextStyle(fontSize: 15),
                 ),
               ),
               onTap: () {
-                _toTab(2);
+                _toTabBar(CenterTabBarType.like);
               },
             ),
           ],
@@ -428,12 +429,24 @@ class _DzContentBuilder extends State<DzContentBuilder> {
     );
   }
 
-  void _toTab(int index) {
-    _tabIndex = index;
-    _centerBarRebuild(() {});
-    _loadPromptRebuild(() {});
-    _sortButtonRebuild(() {});
+  ///点击后先rebuild切换，切换后再获取data再重新rebuild
+  ///原因一：可以快速切换
+  ///原因二：防止连续不同的index请求导致延迟切换
+  void _toTabBar(CenterTabBarType type) {
+    _currentCenterTabBarType = type;
+    _centerTabBarRebuild(() {});
     _footerRebuild(() {});
+
+    ///rebuild内容 TODO:
+
+    _sortButtonRebuild(() {});
+
+    _loadPromptRebuild(() {
+      _isLoadPromptDisplay = true;
+    });
+
+    ///虽然setState是同步的，但最好还是放在最后
+    _tabBarViewFuture();
   }
 
   ///加载提示栏
@@ -442,48 +455,15 @@ class _DzContentBuilder extends State<DzContentBuilder> {
       child: StatefulBuilder(
         builder: (_, loadPromptRebuild) {
           _loadPromptRebuild = loadPromptRebuild;
-          //无需判断_tabIndex
-          return FutureBuilder(
-            future: _loadPromptFuture(),
-            builder: (_, AsyncSnapshot snapshot) {
-              Widget body;
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                body = Center(child: CircularProgressIndicator());
-              } else if (snapshot.connectionState == ConnectionState.done) {
-                body = Container();
-                //if成功
-              }
-              return body;
-            },
-          );
+
+          if (_isLoadPromptDisplay == true) {
+            return Center(child: CircularProgressIndicator());
+          } else {
+            return Container();
+          }
         },
       ),
     );
-  }
-
-  Future _loadPromptFuture() {
-    if (_tabIndex == 0) {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getStar,
-        responseValue: (code, response, isCatch) {},
-      );
-    } else if (_tabIndex == 2) {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getLike,
-        responseValue: (code, response, isCatch) {},
-      );
-    } else {
-      return SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getReview1,
-        responseValue: (code, response, isCatch) {},
-      );
-    }
   }
 
   ///sort栏
@@ -492,7 +472,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
       child: StatefulBuilder(
         builder: (_, sortButtonRebuild) {
           _sortButtonRebuild = sortButtonRebuild;
-          if (_tabIndex == 0 || _tabIndex == 2) {
+          if (_currentCenterTabBarType == CenterTabBarType.like || _currentCenterTabBarType == CenterTabBarType.star) {
             return Container();
           }
           return Row(
@@ -549,13 +529,61 @@ class _DzContentBuilder extends State<DzContentBuilder> {
     );
   }
 
-  //AllListBuilder
-  // Widget _allListBuilderSliver() {
-  //   return AllListBuilderSliver(
-  //     dzId: widget.data["dz_id"],
-  //     key: _allListBuilderSliverGlobalKey,
-  //   );
-  // }
+  Future _tabBarViewFuture() async {
+    ///若有新数据，则更新data，否则保持旧数据
+    if (_currentCenterTabBarType == CenterTabBarType.star) {
+      await SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getStar,
+        toCodeHandles: (code, response) {
+          return [];
+        },
+        toOtherCodeHandles: () {},
+        bindLine: "CenterTabBarType.star",
+        isLoading: false,
+      );
+    } else if (_currentCenterTabBarType == CenterTabBarType.like) {
+      await SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getLike,
+        toCodeHandles: (code, response) {
+          return [];
+        },
+        toOtherCodeHandles: () {},
+        bindLine: "CenterTabBarType.like",
+        isLoading: false,
+      );
+    } else {
+      await SendRequest.request(
+        context: context,
+        method: "GET",
+        route: RouteName.noIdRoutes.dzPage.getReview1,
+        toCodeHandles: (code, response) {
+          return [];
+        },
+        toOtherCodeHandles: () {},
+        bindLine: "CenterTabBarType.review",
+        isLoading: false,
+      );
+    }
+    _centerTabBarRebuild(() {});
+    _sortButtonRebuild(() {});
+    _loadPromptRebuild(() {
+      _isLoadPromptDisplay = false;
+    });
+  }
+
+  //tabBarView主控制
+  Widget _tabBarViewSliver() {
+    return StatefulBuilder(
+      builder: (_, allListBuilderRebuild) {
+        _allListBuilderRebuild = allListBuilderRebuild;
+        if (_currentCenterTabBarType == CenterTabBarType.star) {}
+      },
+    );
+  }
 }
 
 ///
@@ -571,8 +599,7 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 class AllListBuilderSliver extends StatefulWidget {
   AllListBuilderSliver({
     @required this.dzId,
-    @required Key key,
-  }) : super(key: key);
+  });
   final String dzId;
 
   @override

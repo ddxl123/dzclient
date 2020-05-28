@@ -2,6 +2,7 @@ import 'package:bot_toast/bot_toast.dart';
 import 'package:connectivity/connectivity.dart';
 import 'package:dio/dio.dart';
 import 'package:dzclient/bi/CheckNetwork.dart';
+import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/SP.dart';
 import 'package:flutter/material.dart';
 
@@ -9,7 +10,7 @@ class SendRequest {
   static Map<String, bool> _bindLineMap = {};
 
   static Dio _dio;
-  static String _url = "http://10.128.71.43:8081";
+  static String _url = "http://192.168.137.1:8081";
   static void initInMain() {
     _dio = Dio();
     _dio.options.baseUrl = _url;
@@ -26,28 +27,46 @@ class SendRequest {
     return true;
   }
 
-  static Future<void> request({
+  static Future request({
     @required BuildContext context,
     @required String method,
     @required String route,
     Map<dynamic, dynamic> data,
     Map<String, dynamic> query,
-    @required Function(String, Response<dynamic>, bool) responseValue,
-    String bindLine,
-    bool isLoading = false,
+    @required List<bool> Function(String code, Response<dynamic> response) toCodeHandles,
+    @required Function toOtherCodeHandles,
+    @required String bindLine,
+    @required bool isLoading,
   }) async {
+    ///TODO: 耗时测试，可移除
+    await Future.delayed(Duration(seconds: 2));
+
     ///检查网络
     if (!_hasNetwork()) {
+      await Future(() {}).whenComplete(() {
+        responseCodeHandles(
+          toCodeHandles: toCodeHandles("0", null),
+          toOtherCodeHandles: toOtherCodeHandles(),
+          otherCodeHandles: otherCodeHandles(code: "0", context: context, onError: null, route: route),
+        );
+      });
       return;
     }
 
-    //绑定线路
+    ///绑定线路
     if (bindLine != null) {
       if (_bindLineMap[bindLine] == true) {
-        BotToast.showNotification(title: (_) => Text("请求过于频繁"));
+        await Future(() {}).whenComplete(() {
+          responseCodeHandles(
+            toCodeHandles: toCodeHandles("1", null),
+            toOtherCodeHandles: toOtherCodeHandles(),
+            otherCodeHandles: otherCodeHandles(code: "1", context: context, onError: null, route: route),
+          );
+        });
         return;
       }
-      //注意要让 _bindLineMap[bindLine] = false
+
+      ///注意要让 _bindLineMap[bindLine] = false
       _bindLineMap[bindLine] = true;
     }
 
@@ -55,15 +74,7 @@ class SendRequest {
     OverlayEntry entry = isLoading ? _requestLoading(context) : null;
 
     ///发送请求
-    BotToast.showNotification(title: (_) => Text("正在发送..."));
-
-    ///响应数据，包含捕获的错误的情况
-    String handleCode;
-    Response<dynamic> handleResponse;
-    bool handleIsCatch = false;
-
-    ///TODO: 耗时测试，可移除
-    await Future.delayed(Duration(seconds: 2));
+    // BotToast.showNotification(title: (_) => Text("正在发送..."));
 
     await _dio
         .request(
@@ -74,31 +85,22 @@ class SendRequest {
     )
         .then(
       (onValue) {
-        handleCode = onValue.data["code"];
-        handleResponse = onValue;
+        responseCodeHandles(
+          toCodeHandles: toCodeHandles(onValue.data["code"], onValue),
+          toOtherCodeHandles: toOtherCodeHandles(),
+          otherCodeHandles: otherCodeHandles(code: onValue.data["code"], context: context, onError: null, route: route),
+        );
       },
     ).catchError(
       (onError) {
-        handleIsCatch = true;
-
         ///综合异常处理
-        if (onError.runtimeType == DioError) {
-          switch (onError.type) {
-            case DioErrorType.CONNECT_TIMEOUT:
-              //连接超时=请求时间+响应时间，没有响应的话，客户端是无法判断是否超时的。
-              BotToast.showNotification(title: (_) => Text("err:连接服务器超时\n$route"));
-              break;
-            default:
-              BotToast.showNotification(title: (_) => Text("err:请求或响应异常\n$route\n${onError.type}"));
-          }
-        } else {
-          BotToast.showNotification(title: (_) => Text("err:请求或响应异常\n$route\n$onError"));
-          print(onError);
-        }
+        responseCodeHandles(
+          toCodeHandles: toCodeHandles("2", null),
+          toOtherCodeHandles: toOtherCodeHandles(),
+          otherCodeHandles: otherCodeHandles(code: "2", context: context, onError: onError, route: route),
+        );
       },
-    ).whenComplete(() {
-      responseValue(handleCode, handleResponse, handleIsCatch);
-    });
+    );
 
     entry?.remove();
     if (bindLine != null) {
