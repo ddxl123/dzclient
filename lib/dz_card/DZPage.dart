@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:ui';
 
 import 'package:bot_toast/bot_toast.dart';
@@ -6,13 +5,9 @@ import 'package:dzclient/bi/ResponseCodeHandle.dart';
 import 'package:dzclient/bi/RouteName.dart';
 import 'package:dzclient/bi/SendRequest.dart';
 import 'package:dzclient/handles/UserIcons.dart';
-import 'package:dzclient/tools/BButton.dart';
 import 'package:dzclient/tools/ShowReview.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
-
-enum CenterTabBarType { star, review, like }
 
 class DZPage extends StatefulWidget {
   DZPage(this.dzId);
@@ -28,11 +23,9 @@ class _DZPage extends State<DZPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: FutureBuilder(
-        future: _future(),
-        builder: _builder,
-      ),
+    return FutureBuilder(
+      future: _future(),
+      builder: _builder,
     );
   }
 
@@ -110,16 +103,6 @@ class _DZPage extends State<DZPage> {
   }
 }
 
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
 class DzContentBuilder extends StatefulWidget {
   DzContentBuilder({this.dzContentData, this.reloadDzContent});
   // widget.data不会为null,因为已经有默认值{}了
@@ -134,34 +117,16 @@ class DzContentBuilder extends StatefulWidget {
 }
 
 class _DzContentBuilder extends State<DzContentBuilder> {
-  TextEditingController _textEditingController = TextEditingController();
   RefreshController _refreshController = RefreshController();
+  TextEditingController _textEditingController = TextEditingController();
 
-  //初始值是review
-  CenterTabBarType _currentCenterTabBarType = CenterTabBarType.review;
+  double _bottomHeight = 40;
 
-  Function(Function()) _sortButtonRebuild;
-  Function(Function()) _footerRebuild;
-  Function(Function()) _centerTabBarRebuild;
-  Function(Function()) _loadPromptRebuild;
-  Function(Function()) _allListBuilderRebuild;
+  ///必须默认为true
+  bool _isMainEvent = true;
 
-  bool _isLoadPromptDisplay = false;
-
-  Map _centerTabBarData = {};
-  Map _starData = {};
-  Map _reviewData = {};
-  Map _likeData = {};
-
-  void _initCenterTabBarData() {
-    _centerTabBarData["star_count"] ??= 0;
-    _centerTabBarData["review_count"] ??= 0;
-    _centerTabBarData["like_count"] ??= 0;
-  }
-
-  void _initStarData() {}
-  void _initReviewData() {}
-  void _initLikeData() {}
+  ///
+  bool _isShowModalBottomSheet = false;
 
   @override
   void dispose() {
@@ -173,14 +138,16 @@ class _DzContentBuilder extends State<DzContentBuilder> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100],
       appBar: _appBar(),
       body: _allBody(),
-      bottomNavigationBar: _bottomNavigationBar(),
+      bottomSheet: _bottomNavigationBar(),
     );
   }
 
   Widget _bottomNavigationBar() {
     return Container(
+      height: _bottomHeight,
       color: Colors.blue,
       child: Row(
         children: <Widget>[
@@ -258,559 +225,297 @@ class _DzContentBuilder extends State<DzContentBuilder> {
 
   Widget _allBody() {
     return SmartRefresher(
-      physics: BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+      physics: AlwaysScrollableScrollPhysics(),
       enablePullDown: true,
       enablePullUp: true,
       header: WaterDropHeader(),
-      footer: _footer(),
+      footer: CustomFooter(
+        height: 100,
+        loadStyle: LoadStyle.HideAlways,
+        builder: (_, __) {
+          return Text("");
+        },
+      ),
       controller: _refreshController,
       onRefresh: () async {
         await widget.reloadDzContent();
         _refreshController.refreshCompleted();
       },
-      onLoading: () async {
-        _refreshController.loadComplete();
-      },
-      child: CustomScrollView(
-        slivers: <Widget>[
-          ///dz内容
-          _dzContentSliver(),
-
-          ///centerBar
-          _centerTabBarSliver(),
-
-          ///加载栏
-          _loadPromptSliver(),
-
-          ///sort栏
-          _sortButtonSliver(),
-
-          ///AllListBuilder
-          // _allListBuilderSliver()
-        ],
-      ),
-    );
-  }
-
-  Widget _footer() {
-    return CustomFooter(
-      loadStyle: LoadStyle.ShowWhenLoading,
-      builder: (_, LoadStatus loadStatus) {
-        Widget pullUpWidget;
-        if (loadStatus == LoadStatus.idle) {
-          pullUpWidget = Text("上拉加载");
-        } else if (loadStatus == LoadStatus.loading) {
-          pullUpWidget = CircularProgressIndicator();
-        } else if (loadStatus == LoadStatus.failed) {
-          pullUpWidget = Text("加载失败！点击重试！");
-        } else if (loadStatus == LoadStatus.canLoading) {
-          pullUpWidget = Text("松手,加载更多!");
-        } else {
-          pullUpWidget = Text("没有更多数据了!");
-        }
-
-        return StatefulBuilder(
-          builder: (_, footerRebuild) {
-            _footerRebuild = footerRebuild;
-            //写上这一句，防止在false的时候出现空占位
-            _refreshController.loadComplete();
-            return Container(
-              child: Center(
-                child: pullUpWidget,
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  ///dz内容
-  Widget _dzContentSliver() {
-    return SliverToBoxAdapter(
-      child: Column(
-        children: <Widget>[
-          //标题
-          Container(
-            padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              widget.dzContentData["title"],
-              style: TextStyle(fontSize: 18),
-            ),
-          ),
-          //内容
-          Container(
-            padding: EdgeInsets.all(15),
-            alignment: Alignment.centerLeft,
-            child: Text(
-              widget.dzContentData["content"],
-              style: TextStyle(fontSize: 14, height: 1.8),
-            ),
-          ),
-          //时间栏
-          Container(
-            alignment: Alignment.center,
-            padding: EdgeInsets.all(10),
-            child: Text(
-              "发布于 " + widget.dzContentData["update_time"].toString(),
-              style: TextStyle(
-                fontSize: 12,
-                height: 2,
-                color: Colors.grey[600],
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  ///centerTabBar
-  Widget _centerTabBarSliver() {
-    return StatefulBuilder(
-      builder: (_, centerTabBarRebuild) {
-        _centerTabBarRebuild = centerTabBarRebuild;
-
-        ///每次被rebuild,都要重新初始化一次数据
-        _initCenterTabBarData();
-
-        ///无需判断_tabIndex
-        return SliverAppBar(
-          automaticallyImplyLeading: false,
-          pinned: true,
-          snap: true,
-          floating: true,
-          centerTitle: true,
-          actions: <Widget>[
-            GestureDetector(
-              child: Container(
-                padding: EdgeInsets.all(10),
-                alignment: Alignment.center,
-                child: Text(
-                  "收藏 · " + (_centerTabBarData["star_count"] > 99 ? "99+" : _centerTabBarData["star_count"].toString()),
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-              onTap: () {
-                _toTabBar(CenterTabBarType.star);
-              },
-            ),
-            GestureDetector(
-              child: Container(
-                padding: EdgeInsets.all(10),
-                alignment: Alignment.center,
-                child: Text(
-                  "评论 · " + (_centerTabBarData["review_count"] > 99 ? "99+" : _centerTabBarData["review_count"].toString()),
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-              onTap: () {
-                _toTabBar(CenterTabBarType.review);
-              },
-            ),
-            Expanded(child: Container()),
-            GestureDetector(
-              child: Container(
-                padding: EdgeInsets.all(10),
-                alignment: Alignment.center,
-                child: Text(
-                  "喜欢 · " + (_centerTabBarData["like_count"] > 99 ? "99+" : _centerTabBarData["like_count"].toString()),
-                  style: TextStyle(fontSize: 15),
-                ),
-              ),
-              onTap: () {
-                _toTabBar(CenterTabBarType.like);
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  ///点击后先rebuild切换，切换后再获取data再重新rebuild
-  ///原因一：可以快速切换
-  ///原因二：防止连续不同的index请求导致延迟切换
-  void _toTabBar(CenterTabBarType type) {
-    _currentCenterTabBarType = type;
-    _centerTabBarRebuild(() {});
-    _footerRebuild(() {});
-
-    ///rebuild内容 TODO:
-
-    _sortButtonRebuild(() {});
-
-    _loadPromptRebuild(() {
-      _isLoadPromptDisplay = true;
-    });
-
-    ///虽然setState是同步的，但最好还是放在最后
-    _tabBarViewFuture();
-  }
-
-  ///加载提示栏
-  Widget _loadPromptSliver() {
-    return SliverToBoxAdapter(
-      child: StatefulBuilder(
-        builder: (_, loadPromptRebuild) {
-          _loadPromptRebuild = loadPromptRebuild;
-
-          if (_isLoadPromptDisplay == true) {
-            return Center(child: CircularProgressIndicator());
-          } else {
-            return Container();
-          }
-        },
-      ),
-    );
-  }
-
-  ///sort栏
-  Widget _sortButtonSliver() {
-    return SliverToBoxAdapter(
-      child: StatefulBuilder(
-        builder: (_, sortButtonRebuild) {
-          _sortButtonRebuild = sortButtonRebuild;
-          if (_currentCenterTabBarType == CenterTabBarType.like || _currentCenterTabBarType == CenterTabBarType.star) {
-            return Container();
-          }
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[
-              StatefulBuilder(
-                builder: (sortButtonContext, sortButtonRebuild) {
-                  return BButton(
-                    child: Container(
-                      padding: EdgeInsets.all(10),
-                      child: Text("最新", style: TextStyle(color: Colors.blue)),
-                    ),
-                    onTap: () {
-                      showMenu(
-                        context: sortButtonContext,
-                        position: RelativeRect.fromLTRB(
-                          1,
-                          (sortButtonContext.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy,
-                          0,
-                          0,
-                        ),
-                        items: <PopupMenuEntry<dynamic>>[
-                          PopupMenuItem(
-                            value: 0,
-                            enabled: false,
-                            child: Text("排序"),
-                          ),
-                          PopupMenuItem(
-                            value: 1,
-                            child: Text("最新", style: TextStyle(color: Colors.blue)),
-                          ),
-                          PopupMenuItem(
-                            value: 2,
-                            child: Text("热度", style: TextStyle(color: Colors.blue)),
-                          ),
-                        ],
-                      ).then((value) {
-                        switch (value) {
-                          case 1:
-                            break;
-                          case 2:
-                            break;
-                          default:
-                        }
-                      });
-                    },
-                  );
-                },
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Future _tabBarViewFuture() async {
-    ///若有新数据，则更新data，否则保持旧数据
-    if (_currentCenterTabBarType == CenterTabBarType.star) {
-      await SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getStar,
-        toCodeHandles: (code, response) {
-          return [];
-        },
-        toOtherCodeHandles: () {},
-        bindLine: "CenterTabBarType.star",
-        isLoading: false,
-      );
-    } else if (_currentCenterTabBarType == CenterTabBarType.like) {
-      await SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getLike,
-        toCodeHandles: (code, response) {
-          return [];
-        },
-        toOtherCodeHandles: () {},
-        bindLine: "CenterTabBarType.like",
-        isLoading: false,
-      );
-    } else {
-      await SendRequest.request(
-        context: context,
-        method: "GET",
-        route: RouteName.noIdRoutes.dzPage.getReview1,
-        toCodeHandles: (code, response) {
-          return [];
-        },
-        toOtherCodeHandles: () {},
-        bindLine: "CenterTabBarType.review",
-        isLoading: false,
-      );
-    }
-    _centerTabBarRebuild(() {});
-    _sortButtonRebuild(() {});
-    _loadPromptRebuild(() {
-      _isLoadPromptDisplay = false;
-    });
-  }
-
-  //tabBarView主控制
-  Widget _tabBarViewSliver() {
-    return StatefulBuilder(
-      builder: (_, allListBuilderRebuild) {
-        _allListBuilderRebuild = allListBuilderRebuild;
-        if (_currentCenterTabBarType == CenterTabBarType.star) {}
-      },
-    );
-  }
-}
-
-///
-///
-///
-///
-///
-///
-///
-///
-///
-///
-class AllListBuilderSliver extends StatefulWidget {
-  AllListBuilderSliver({
-    @required this.dzId,
-  });
-  final String dzId;
-
-  @override
-  State<StatefulWidget> createState() {
-    return _AllListBuilderSliver();
-  }
-}
-
-class _AllListBuilderSliver extends State<AllListBuilderSliver> {
-  int _tabIndex = 1;
-  void toTab(int index) {
-    _tabIndex = index;
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _future(),
-      builder: _builder,
-    );
-  }
-
-  ///失败返回false，成功则返回其数据
-  Future _future() {}
-
-  Widget _builder(_, AsyncSnapshot snapshot) {
-    switch (snapshot.connectionState) {
-      case ConnectionState.waiting:
-        return SliverToBoxAdapter(
-          child: Column(
-            children: <Widget>[
-              CircularProgressIndicator(),
-              Text("加载中..."),
-            ],
-          ),
-        );
-        break;
-      case ConnectionState.done:
-        if (snapshot.data == false) {
-        } else {}
-        return ReviewBuilder();
-      default:
-        return SliverToBoxAdapter(
-          child: Container(),
-        );
-    }
-  }
-}
-
-///
-///
-///
-///
-///
-class ReviewBuilder extends StatefulWidget {
-  @override
-  State<StatefulWidget> createState() {
-    return _ReviewBuilder();
-  }
-}
-
-class _ReviewBuilder extends State<ReviewBuilder> {
-  ///必须默认为true
-  bool _isMainEvent = true;
-
-  @override
-  Widget build(BuildContext context) {
-    Color mainColor = Colors.white;
-
-    return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (_, index) {
-          return StatefulBuilder(
-            builder: (_, rebuild) {
-              return GestureDetector(
-                onPanDown: (_) {
-                  if (_isMainEvent == true) {
-                    mainColor = Colors.grey[300];
-                    rebuild(() {});
-                  }
-                },
-                onPanCancel: () {
-                  if (_isMainEvent == true) {
-                    mainColor = Colors.white;
-                    rebuild(() {});
-                  }
-                },
-                onPanEnd: (_) {
-                  if (_isMainEvent == true) {
-                    mainColor = Colors.white;
-                    rebuild(() {});
-                  }
-                },
-                onTap: () {
-                  if (_isMainEvent == true) {}
-                },
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: mainColor,
-                    border: Border(bottom: BorderSide(color: Colors.blue[100], width: 0.5)),
+      onOffsetChange: (up, offset) async {
+        if (!up && offset > 80 && _isShowModalBottomSheet == false) {
+          _isShowModalBottomSheet = true;
+          await showModalBottomSheet(
+            //这里必须要透明
+            backgroundColor: Colors.transparent,
+            isScrollControlled: true,
+            context: context,
+            builder: (_) {
+              return Container(
+                height: MediaQueryData.fromWindow(window).size.height - MediaQueryData.fromWindow(window).padding.top - kToolbarHeight,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(10),
+                    topRight: Radius.circular(10),
                   ),
-                  padding: EdgeInsets.all(10),
+                ),
+                child: SingleChildScrollView(
                   child: Column(
                     children: <Widget>[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          ///左
-                          Icon(
-                            Icons.ac_unit,
-                            color: Colors.blue,
-                            size: 26,
-                          ),
-                          SizedBox(width: 10),
-
-                          ///中
-                          //这里必须是Expanded
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                ///评论者姓名
-                                Row(
-                                  children: <Widget>[
-                                    Text(
-                                      "更多Greg",
-                                      style: TextStyle(
-                                        color: Colors.black54,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                    Expanded(child: Container()),
-                                  ],
-                                ),
-                                SizedBox(height: 5),
-
-                                ///评论内容
-                                RichText(
-                                  text: TextSpan(
-                                    children: <TextSpan>[
-                                      TextSpan(
-                                        text: "大赛分为公尺反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d.反反反馈d.反反反馈d.反反反馈d.",
-                                        style: TextStyle(
-                                          color: Colors.black,
-                                          fontSize: 13,
-                                          height: 1.6,
-                                        ),
-                                      ),
-
-                                      ///评论时间
-                                      TextSpan(
-                                        text: " 10:30",
-                                        style: TextStyle(
-                                          color: Colors.grey[600],
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                ///评论的评论
-                                Container(
-                                  alignment: Alignment.centerLeft,
-                                  color: Colors.grey[100],
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: <Widget>[
-                                      shortReview(),
-                                      shortReview(),
-                                      allReview(),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          SizedBox(width: 10),
-
-                          ///右
-                          ///赞
-                          Column(
-                            children: <Widget>[
-                              SizedBox(height: 20),
-                              Icon(
-                                Icons.thumb_up,
-                                size: 16,
-                                color: Colors.grey[600],
-                              ),
-                              Text(
-                                "99+",
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                      singleReview(),
+                      singleReview(),
+                      singleReview(),
                     ],
                   ),
                 ),
               );
             },
           );
-        },
-        childCount: 10,
+          _isShowModalBottomSheet = false;
+        }
+      },
+      child: CustomScrollView(
+        slivers: <Widget>[
+          ///dz内容
+          _dzContentSliver(),
+
+          SliverToBoxAdapter(
+            child: Center(
+              child: Container(
+                padding: EdgeInsets.all(10),
+                child: Text(
+                  "上拉查看全部99条评论",
+                  style: TextStyle(color: Colors.blue),
+                ),
+              ),
+            ),
+          ),
+
+          SliverToBoxAdapter(
+            child: Center(
+              child: Container(
+                height: _bottomHeight,
+                padding: EdgeInsets.all(10),
+              ),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  ///dz内容
+  Widget _dzContentSliver() {
+    return SliverToBoxAdapter(
+      child: Container(
+        color: Colors.white,
+        child: Column(
+          children: <Widget>[
+            //标题
+            Container(
+              padding: EdgeInsets.fromLTRB(15, 15, 15, 0),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.dzContentData["title"],
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+            //内容
+            Container(
+              padding: EdgeInsets.all(15),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                widget.dzContentData["content"],
+                style: TextStyle(fontSize: 14, height: 1.8),
+              ),
+            ),
+            //时间栏
+            Container(
+              alignment: Alignment.center,
+              padding: EdgeInsets.all(10),
+              child: Text(
+                "发布于 " + widget.dzContentData["update_time"].toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 2,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ),
+            Container(
+              color: Colors.grey[100],
+              height: 10,
+            ),
+            Container(
+              alignment: Alignment.centerLeft,
+              padding: EdgeInsets.all(10),
+              child: Text(
+                "评论",
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            singleReview(),
+            singleReview(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget singleReview() {
+    Color mainColor = Colors.white;
+
+    return StatefulBuilder(
+      builder: (_, rebuild) {
+        return GestureDetector(
+          onPanDown: (_) {
+            if (_isMainEvent == true) {
+              mainColor = Colors.grey[300];
+              rebuild(() {});
+            }
+          },
+          onPanCancel: () {
+            if (_isMainEvent == true) {
+              mainColor = Colors.white;
+              rebuild(() {});
+            }
+          },
+          onPanEnd: (_) {
+            if (_isMainEvent == true) {
+              mainColor = Colors.white;
+              rebuild(() {});
+            }
+          },
+          onTap: () {
+            if (_isMainEvent == true) {}
+          },
+          child: Container(
+            decoration: BoxDecoration(
+              color: mainColor,
+              border: Border(bottom: BorderSide(color: Colors.blue[100], width: 0.5)),
+            ),
+            padding: EdgeInsets.all(10),
+            child: Column(
+              children: <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    ///左
+                    Icon(
+                      Icons.ac_unit,
+                      color: Colors.blue,
+                      size: 26,
+                    ),
+                    SizedBox(width: 10),
+
+                    ///中
+                    //这里必须是Expanded
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          ///评论者姓名
+                          Row(
+                            children: <Widget>[
+                              Text(
+                                "更多Greg",
+                                style: TextStyle(
+                                  color: Colors.black54,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Expanded(child: Container()),
+                            ],
+                          ),
+                          SizedBox(height: 5),
+
+                          ///评论内容
+                          RichText(
+                            text: TextSpan(
+                              children: <TextSpan>[
+                                TextSpan(
+                                  text: "大赛分为公尺反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d大赛分为公尺上帝发布微博反反反反反馈d.反反反馈d.反反反馈d.反反反馈d.",
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 13,
+                                    height: 1.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          SizedBox(height: 10),
+
+                          ///评论的评论
+                          Container(
+                            alignment: Alignment.centerLeft,
+                            color: Colors.grey[100],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                shortReview(),
+                                shortReview(),
+                              ],
+                            ),
+                          ),
+
+                          SizedBox(height: 10),
+
+                          ///赞数
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: <Widget>[
+                              ///评论时间
+                              Text(
+                                "10:30",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                ),
+                              ),
+                              Expanded(child: Container()),
+                              Row(
+                                children: <Widget>[
+                                  Icon(
+                                    Icons.thumb_up,
+                                    color: Colors.grey[600],
+                                  ),
+                                  Text(
+                                    " 9999",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(width: 10),
+                              Row(
+                                children: <Widget>[
+                                  Icon(
+                                    Icons.rate_review,
+                                    color: Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                              SizedBox(width: 10),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -852,7 +557,7 @@ class _ReviewBuilder extends State<ReviewBuilder> {
             if (isContainerEvent == true) {}
           },
           child: Container(
-            margin: EdgeInsets.fromLTRB(10, 10, 10, 0),
+            margin: EdgeInsets.fromLTRB(10, 5, 10, 5),
             color: containerColor,
             child: Row(
               children: <Widget>[
@@ -903,48 +608,6 @@ class _ReviewBuilder extends State<ReviewBuilder> {
               ],
             ),
           ),
-        );
-      },
-    );
-  }
-
-  Widget allReview() {
-    Color bc;
-    return StatefulBuilder(
-      builder: (_, rebuildIn) {
-        return GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: <Widget>[
-              Container(
-                margin: EdgeInsets.fromLTRB(10, 10, 10, 10),
-                color: bc,
-                child: Text(
-                  "查看全部99+条评论",
-                  style: TextStyle(fontSize: 14, color: Colors.blue),
-                ),
-              ),
-            ],
-          ),
-          onPanDown: (_) {
-            bc = Colors.grey[300];
-            _isMainEvent = false;
-            rebuildIn(() {});
-          },
-          onPanCancel: () {
-            bc = null;
-            _isMainEvent = true;
-            rebuildIn(() {});
-          },
-          onPanEnd: (_) {
-            bc = null;
-            _isMainEvent = true;
-            rebuildIn(() {});
-          },
-          onTap: () {
-            //TODO: 跳转到对方个人中心
-          },
         );
       },
     );

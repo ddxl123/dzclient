@@ -4,6 +4,7 @@ import 'package:dzclient/bi/SP.dart';
 import 'package:dzclient/bi/SendRequest.dart';
 import 'package:dzclient/home/HomePage.dart';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 void main() {
@@ -54,9 +55,66 @@ class _TestDemo extends State<TestDemo> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(),
-        body: InkWell(
-          child: Text("data"),
-          onTap: () {},
+        body: LayoutBuilder(
+          builder: (_, constraint) {
+            return Container(
+              width: constraint.maxWidth,
+              height: constraint.maxHeight,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                physics: AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                child: Column(
+                  children: <Widget>[
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                    Text("data"),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );

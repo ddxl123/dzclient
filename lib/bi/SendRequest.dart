@@ -10,7 +10,7 @@ class SendRequest {
   static Map<String, bool> _bindLineMap = {};
 
   static Dio _dio;
-  static String _url = "http://192.168.137.1:8081";
+  static String _url = "http://10.128.248.169:8081";
   static void initInMain() {
     _dio = Dio();
     _dio.options.baseUrl = _url;
@@ -38,28 +38,27 @@ class SendRequest {
     @required String bindLine,
     @required bool isLoading,
   }) async {
-    ///TODO: 耗时测试，可移除
-    await Future.delayed(Duration(seconds: 2));
-
     ///检查网络
     if (!_hasNetwork()) {
       await Future(() {}).whenComplete(() {
         responseCodeHandles(
           toCodeHandles: toCodeHandles("0", null),
-          toOtherCodeHandles: toOtherCodeHandles(),
+          toOtherCodeHandles: toOtherCodeHandles,
           otherCodeHandles: otherCodeHandles(code: "0", context: context, onError: null, route: route),
         );
       });
       return;
     }
 
+    ///TODO: 中断上次请求的回调 和 中断第二次请求的回调
     ///绑定线路
     if (bindLine != null) {
       if (_bindLineMap[bindLine] == true) {
         await Future(() {}).whenComplete(() {
+          print(["toOtherCodeHandles", toOtherCodeHandles]);
           responseCodeHandles(
             toCodeHandles: toCodeHandles("1", null),
-            toOtherCodeHandles: toOtherCodeHandles(),
+            toOtherCodeHandles: toOtherCodeHandles,
             otherCodeHandles: otherCodeHandles(code: "1", context: context, onError: null, route: route),
           );
         });
@@ -76,6 +75,9 @@ class SendRequest {
     ///发送请求
     // BotToast.showNotification(title: (_) => Text("正在发送..."));
 
+    ///TODO: 耗时测试，可移除
+    // await Future.delayed(Duration(seconds: 2));
+
     await _dio
         .request(
       route,
@@ -87,7 +89,7 @@ class SendRequest {
       (onValue) {
         responseCodeHandles(
           toCodeHandles: toCodeHandles(onValue.data["code"], onValue),
-          toOtherCodeHandles: toOtherCodeHandles(),
+          toOtherCodeHandles: toOtherCodeHandles,
           otherCodeHandles: otherCodeHandles(code: onValue.data["code"], context: context, onError: null, route: route),
         );
       },
@@ -96,7 +98,7 @@ class SendRequest {
         ///综合异常处理
         responseCodeHandles(
           toCodeHandles: toCodeHandles("2", null),
-          toOtherCodeHandles: toOtherCodeHandles(),
+          toOtherCodeHandles: toOtherCodeHandles,
           otherCodeHandles: otherCodeHandles(code: "2", context: context, onError: onError, route: route),
         );
       },
